@@ -49,6 +49,8 @@ Autres :
 
 ### Calibrer la sonde PH avec les solutions PH :
 
+ - préparer les solutions de tests et de l'eau distillé pour rincer la sonde
+
 ### HomeAssistant panneau piscine :
 
 ![links](https://github.com/NicoDupont/esp_gestion_piscine/blob/main/img/hapiscine.png?raw=true)
@@ -59,7 +61,7 @@ Autres :
 
 #### Evolutions possibles :  
  - Sonde orp
- - Remplissage auto avec vanne motorisé, flotteur , debimetre
+ - Remplissage auto niveau avec vanne motorisée, flotteur  , debimetre
  - Gestion Hivernage
- - Gestion ph+ ou ph- avec une pompe péristaltique + calcul qt
- - Gestion chlore avec une pompe péristaltique + calcul qt
+ - Gestion ph+ ou ph- avec une pompe péristaltique
+ - Gestion chlore avec une pompe péristaltique
