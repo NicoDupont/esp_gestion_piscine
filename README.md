@@ -6,7 +6,8 @@
  - temperature eau pisicine
  - contact pompe de filtration
  - ph
- - capteur circulation eau  
+ - capteur circulation eau  oui/non
+ - led de status + ecran
 
 ### Liste des composants :
 
@@ -17,15 +18,14 @@ Electronique :
 - 1x convertisseur dc 12v=>5v
 - 1x convertisseur dc 5v=>3.3v (ams1117)
 - 1x BME280 (3.3v)
-- 2x DS18B20 (3.3v)
+- 3x DS18B20 (3.3v)
 - 1x resistance 4.7 Kohm
-- 2x résistance 10 kohm
+- 4x résistance 10 kohm
 - 1x PCF8575 (3.3v)
 - 1x ADS1115 (5v) + 1x level shifter (i2c 5v<=>3.3v)
-- 1x MLX90614 non-contact thermometer
 - 1x ecran i2c ssd1306
 - 1x [pzem-004t v3](https://www.aliexpress.com/item/1005005620371930.html?spm=a2g0o.order_list.order_list_main.29.58601802vbEUjW)
-- 2x led verte basique
+- 4x led verte basique
 - 2x fusibles + 2x porte fusible
 - pcb 2.54mm, jst, bornier, etc...
 
@@ -61,7 +61,7 @@ Autres :
 
 #### Evolutions possibles :  
  - Sonde orp
- - Remplissage auto niveau avec vanne motorisée, flotteur  , debimetre
+ - Remplissage auto niveau avec vanne motorisée / electrovanne, flotteur  , debimetre
  - Gestion Hivernage
  - Gestion ph+ ou ph- avec une pompe péristaltique
  - Gestion chlore avec une pompe péristaltique
