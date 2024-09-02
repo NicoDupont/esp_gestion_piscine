@@ -23,6 +23,7 @@
 ### Montage :
 
 ![boitier](https://github.com/NicoDupont/esp_gestion_piscine/blob/main/img/elec1.jpg?raw=true)
+![boitier](https://github.com/NicoDupont/esp_gestion_piscine/blob/main/img/elec2.jpg?raw=true)
 ![isolateur+ads1115](https://github.com/NicoDupont/esp_gestion_piscine/blob/main/img/isolateur.jpg?raw=true)
 ![isolateur+ads1115](https://github.com/NicoDupont/esp_gestion_piscine/blob/main/img/ph.jpg?raw=true)
 

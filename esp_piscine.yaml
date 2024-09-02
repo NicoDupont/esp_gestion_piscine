@@ -1,39 +1,60 @@
 substitutions:
-  friendly_name: "Esp Jardin Piscine"
-  friendly_name_wifiap: "Esp-Piscine-Hotspot"
-  interval_update_court: "5s"
+  friendly_name: "esp-jardin-piscine"
+  friendly_name_wifiap: "Esp-Jardin-Piscine-Hotspot"
+  interval_update_court: "10s"
   interval_update_normal: "60s"
-  interval_update_long: "600s"
+  interval_update_long: "300s"
+  reboot_time_api: "8500min"
+  reboot_time_wifi: "2min"
+  brightness_rgb_led : "20%"
+
 esphome:
   name: esp-jardin-piscine
   friendly_name: esp-jardin-piscine
   comment: esp32u gestion filtration piscine + monitoring T°c, ph, circulation, W/kwh
+  on_boot:
+    then:
+        - light.turn_off:
+            id: EspJardinPiscine_Rgb_Led_Gpio_13
+        - light.turn_off:
+            id: EspJardinPiscine_Rgb_Led_Gpio_14   
+
 esp32:
   board: esp32dev
   framework:
     type: arduino
+
 wifi:
   networks:
   - ssid: !secret wifi_maison_ssid
     password: !secret wifi_maison_password
   - ssid: !secret wifi_maison_2_ssid
     password: !secret wifi_maison_2_password
-  reboot_timeout : 2min #reboot si pas de wifi actif
+  reboot_timeout : ${reboot_time_wifi} #reboot si pas de wifi actif
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "${friendly_name_wifiap}"
     password: !secret wifi_esp_ap_password
+
 # Enable Home Assistant API
 logger:
+
+# Enable Home Assistant API
 api:
+   reboot_timeout : ${reboot_time_api} #reboot if no api connection
 #  encryption:
-#    key: "/cwwnz/W/vY7ACFed70IgB2ejL3m0WsYimZrtHsk/18="
+#    key: "RLgg7Wt0NPRIC0ujlqp034pkvMfA2K3tGA+ghX0HlYw="
+
 ota:
-  password: "c83e8e9b5b943a746113059f30987dd1"
-captive_portal:
+  - platform: esphome
+    id: my_ota
+    password: "5df2418077b34bfdf9b43837ccf03fb7"
+
 #--------------------------------------
-esp32_ble_tracker:
-bluetooth_proxy:
+captive_portal:
+#esp32_ble_tracker:
+#bluetooth_proxy:
+#--------------------------------------
 #--------------------------------------
 web_server:
   port: 80
@@ -42,39 +63,46 @@ web_server:
 #--------------------------------------
 #--------------------------------------
 # ds18b20 temperature eau + ext
-dallas:
-  - update_interval : ${interval_update_normal}
+one_wire:
+  - platform: gpio
     pin: 19
-    id: dallas_a
 
 #--------------------------------------
 #--------------------------------------
-#i2c ads1115 + pcf8575 + bme280 
 i2c:
   - id: bus_a
     sda: 21
     scl: 22
     scan: True
-  
+
   - id: bus_b
-    sda: 26
-    scl: 27
+    sda: 27
+    scl: 23
     scan: True
 
 #--------------------------------------
 #--------------------------------------
-#i2c pcf8575 i/o extender 16 gpio 
-pcf8574:
+#i2c pcf8575 i/o extender 16 gpio pour gérer 16 relais
+pcf8574: #(16 relais)
   - id: 'pcf8575_hub'
     address: 0x20 #ou 0x21
     pcf8575: True
     i2c_id: bus_a
 
-#--------------------------------------
-#--------------------------------------
-#i2c ads1115 pour lire le capteurs de pression 30psi du filtre 0.5=>4.5v + lecture PH
+# Example configuration entry
+pca6416a:  #(10 entrées + 4 leds)
+  - id: 'pca6416a_hub'
+    address: 0x21 # 0x21= addr a vcc 
+    i2c_id: bus_b
+
+#i2c ads1115 pour lire les capteurs de pression 100psi 0.5=>4.5v
 ads1115:
   - address: 0x48
+    id: ads1115_interne
+    i2c_id: bus_a
+
+  - address: 0x4A
+    id: ads1115_isole
     i2c_id: bus_a
 
 #--------------------------------------
@@ -84,28 +112,36 @@ time:
     timezone: "Europe/Paris"
     id: ha_time
 
-#  - platform: sntp
-#    on_time:
-#    # toutes les 10 minutes
-#      - seconds: 0
-#        minutes: /10
-#        then:
-#          - if:
-#              condition:
-#                and:
-#                  - switch.is_on: EspJardinPiscinePompeFiltration
-#                  - binary_sensor.is_off: EspJardinPiscineDebitEau
-#                  - switch.is_on: EspJardinPiscineSecuriteDebitEau
-#              then:
-#                - switch.turn_off: EspJardinPiscinePompeFiltration
+  - platform: sntp
+    on_time:
+    # toutes les 10 minutes
+      - seconds: 0
+        minutes: /10
+        then:
+          - if:
+              condition:
+                and:
+                  - switch.is_on: EspJardinPiscinePompeFiltration
+                  - binary_sensor.is_off: EspJardinPiscineDebitEau
+                  - switch.is_on: EspJardinPiscineSecuriteDebitEau
+              then:
+                - switch.turn_off: EspJardinPiscinePompeFiltration
 
 
 #uart pour pzem004v3
 uart:
-  rx_pin: 16
-  tx_pin: 17
-  baud_rate: 9600
+  - id: uart_pzem
+    tx_pin: 2
+    rx_pin: 15
+    baud_rate: 9600
+    #stop_bits: 1
+
 modbus:
+
+  - id: modbus_pzem
+    uart_id: uart_pzem
+  #   #send_wait_time: 500ms
+  #   #flow_control_pin: 5
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -120,9 +156,9 @@ display:
     model: "SSD1306 128x64"
     i2c_id: bus_b
     address: 0x3C
-    #it.printf(0,20,id(roboto), "pH : %.2f ", id(EspJardinPiscinePh).state);
+    #it.printf(0,20,id(roboto), "pH : %.1f ", id(EspJardinPiscinePh).state);
     lambda: |-
-      it.printf(0,0,id(roboto), "pH : %.2f V", id(EspJardinPiscineA1Voltage).state);
+      it.printf(0,0,id(roboto), "pH : %.1f ", id(EspJardinPiscinePh).state);
       it.printf(0,15,id(roboto), "T°c Eau : %.1f",id(EspJardinPiscineTempEauPiscine).state);
       it.printf(0,30,id(roboto), "Pression : %.2f B",id(EspJardinPiscinePressionFiltreSable).state);
       it.printf(0,45,id(roboto), "Debit - %s", id(EspJardinPiscineDebitEau).state ? "OUI" : "NON");
@@ -132,38 +168,47 @@ display:
 #binary_sensor
 binary_sensor:
 
-#porte de devant du local
-  - platform: gpio
-    pin:
-      number: 13
-      inverted: False
-    name: "${friendly_name} Flotteur Niveau Haut Status"
-    id: EspJardinPiscineFlotteurNiveauHautStatus
-    device_class: opening
+# Flotteur Niveau Haut
+#    pin:
+#      pca6416a: pca6416a_hub
+#      number: 4
+#      mode:
+#        input: true
+#      inverted: false
+#    name: "${friendly_name} Flotteur Niveau Haut Status"
+#    id: EspJardinPiscineFlotteurNiveauHautStatus
+#    device_class: opening
 
-#vanne remplissage fermee
-  - platform: gpio
-    pin:
-      number: 25
-      inverted: False
-    name: "${friendly_name} Porte Avant Status"
-    id: EspJardinPiscinePorteAvantStatus
-    device_class: opening
+# vanne remplissage fermee
+#    pin:
+#      pca6416a: pca6416a_hub
+#      number: 5
+#      mode:
+#        input: true
+#      inverted: false
+#    name: "${friendly_name} Porte Avant Status"
+#    id: EspJardinPiscinePorteAvantStatus
+#    device_class: opening
 
-#hayon/porte du local
-  - platform: gpio
-    pin:
-      number: 14
-      inverted: False
-    name: "${friendly_name} Hayon Status"
-    id: EspJardinPiscineHayonStatus
-    device_class: opening
+# hayon/porte du local
+#    pin:
+#      pca6416a: pca6416a_hub
+#      number: 6
+#      mode:
+#        input: true
+#      inverted: false
+#    name: "${friendly_name} Hayon Status"
+#    id: EspJardinPiscineHayonStatus
+#    device_class: opening
 
 #debit eau
   - platform: gpio
     pin:
-      number: 32
-      inverted: False
+      pca6416a: pca6416a_hub
+      number: 7
+      mode:
+        input: true
+      inverted: false
     name: "${friendly_name} Detecteur Debit Eau"
     id: EspJardinPiscineDebitEau
     device_class: opening
@@ -219,12 +264,12 @@ button:
   - platform: restart
     name: "${friendly_name} Restart"
     id : EspJardinPiscineRestart
-  - platform: shutdown
-    name: "${friendly_name} Shutdown"
-    id : EspJardinPiscineShutdown
-  - platform: safe_mode
-    name: "${friendly_name} Safe Mode"
-    id : EspJardinPiscineSafeMode
+#  - platform: shutdown
+#    name: "${friendly_name} Shutdown"
+#    id : EspJardinPiscineShutdown
+#  - platform: safe_mode
+#    name: "${friendly_name} Safe Mode"
+#    id : EspJardinPiscineSafeMode
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -239,6 +284,7 @@ sensor:
 
 #PZEM POMPE FILTRATION
   - platform: pzemac
+    modbus_id: modbus_pzem
     current:
       name: ${friendly_name} Pump Current"
       id: EspJardinPiscinePumpCurrent
@@ -262,15 +308,10 @@ sensor:
 
 #BME280
 #monitoring de la temperature de la box avec l'electronique / alim / relais
-  - platform: bme280
+  - platform: bme280_i2c
     temperature:
       name: "${friendly_name} Temperature Box"
       id: EspJardinPiscineTempBox
-      oversampling: 16x
-      accuracy_decimals: 1
-    pressure:
-      name: "${friendly_name} Pression Atmo Box"
-      id: EspJardinPiscinePressionAtmoBox
       oversampling: 16x
       accuracy_decimals: 1
     humidity:
@@ -296,21 +337,24 @@ sensor:
 
 #DALLAS
 #eau piscine + ext
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xbb02099245f2e828
     accuracy_decimals: 1
+    resolution: 10
     name: "${friendly_name} Temperature Eau Piscine"
     id: EspJardinPiscineTempEauPiscine
     
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x0402099245fd8628
     accuracy_decimals: 1
+    resolution: 10
     name: "${friendly_name} Temperature Extérieur"
     id: EspJardinPiscineTempExterieur
   
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x1a020792458cee28
     accuracy_decimals: 1
+    resolution: 10
     name: "${friendly_name} Temperature Local Filtration"
     id: EspJardinPiscineTempLocalFiltration
 
@@ -318,20 +362,11 @@ sensor:
 # gain : 6.144 pour la plage de tension (attention au vcc => voir doc ads1115) 
 
   - platform: ads1115
+    ads1115_id: ads1115_interne
     multiplexer: 'A0_GND'
     gain: 6.144 
-    name: "${friendly_name} A0 Voltage"
+    name: "${friendly_name} A0 Voltage Interne"
     id: EspJardinPiscineA0Voltage
-    device_class: voltage
-    unit_of_measurement: V
-    state_class: "measurement"
-    update_interval: ${interval_update_court}
-
-  - platform: ads1115
-    multiplexer: 'A1_GND'
-    gain: 6.144 
-    name: "${friendly_name} A1 Voltage"
-    id: EspJardinPiscineA1Voltage
     device_class: voltage
     unit_of_measurement: V
     state_class: "measurement"
@@ -339,6 +374,7 @@ sensor:
 
   # pression filtre à sable  0=>30psi = 0=>2bar
   - platform: ads1115
+    ads1115_id: ads1115_interne
     multiplexer: 'A0_GND'
     gain: 6.144 
     name: "${friendly_name} Pression Filtre Sable"
@@ -352,15 +388,66 @@ sensor:
             - 0.5 -> 0 
             - 4.5 -> 2.06843
       - sliding_window_moving_average:
-          window_size: 5
-          send_every: 1
+          window_size: 10
+          send_every: 10
+          send_first_at: 5
       - lambda: if (x>2.06843) { return 2.06843; } else {if (x<0) {return 0;} else {return x;} }
     unit_of_measurement: bar
-    update_interval: ${interval_update_court}   
+    update_interval: ${interval_update_court}
+    on_value_range:
+        - above: 0.5
+          below: 0.8
+          then:
+            - light.turn_on:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                color_brightness: ${brightness_rgb_led}
+            - light.addressable_set:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                red: 50%
+                green: 100%
+                blue: 50%
+                color_brightness: ${brightness_rgb_led}
+        - above: 0.81
+          then:
+            - light.turn_on:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                color_brightness: ${brightness_rgb_led}
+            - light.addressable_set:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                red: 100%
+                green: 0%
+                blue: 0%
+                color_brightness: ${brightness_rgb_led}
+        - below: 0.49
+          then:
+            - light.turn_on:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                color_brightness: ${brightness_rgb_led}
+            - light.addressable_set:
+                id: EspJardinPiscine_Rgb_Led_Gpio_14
+                red: 0%
+                green: 100%
+                blue: 0%
+                color_brightness: ${brightness_rgb_led}
+
+  #-------------------------------------------
+  #-------------------------------------------
+  #ADS1115 isolé pour sonde PH
+  - platform: ads1115
+    ads1115_id: ads1115_isole
+    multiplexer: 'A0_GND'
+    gain: 6.144 
+    name: "${friendly_name} A0 Voltage Isole"
+    id: EspJardinPiscineA1Voltage
+    device_class: voltage
+    unit_of_measurement: V
+    state_class: "measurement"
+    update_interval: ${interval_update_court}
 
   # mesure du PH
   - platform: ads1115
-    multiplexer: 'A1_GND'
+    ads1115_id: ads1115_isole
+    multiplexer: 'A0_GND'
     gain: 6.144 
     name: "${friendly_name} Ph"
     id: "EspJardinPiscinePh"
@@ -370,13 +457,15 @@ sensor:
     accuracy_decimals: 2
     filters:
       - calibrate_linear:
-            - 0.5 -> 0 
-            - 5 -> 12
+            - 2.14 -> 9.18
+            - 2.56 -> 6.86
+            - 3.07 -> 4 
       - sliding_window_moving_average:
-          window_size: 5
+          window_size: 10
           send_every: 1
+          send_first_at: 1
       - lambda: if (x>12) { return 12; } else {if (x<0) {return 0;} else {return x;} }
-    update_interval: ${interval_update_normal}   
+    update_interval: ${interval_update_court}   
 
 # DIAGNOSTIQUE
 #--------------------------------------
@@ -412,7 +501,7 @@ sensor:
 
 #--------------------------------------
 #--------------------------------------
-# GESTION RELAIS
+# GESTION RELAIS  (16 relais disponibles)
 switch:
 
 #--------------------------------------
@@ -434,10 +523,14 @@ switch:
     then:
       - light.turn_off: EspJardinPiscineStatusLed1
 
+
+#--------------------------------------
+# TEMPLATE
+
 - platform: template
   name: "${friendly_name} Securite Debit Eau"
   id: EspJardinPiscineSecuriteDebitEau
-  restore_mode: 'ALWAYS_ON'
+  restore_mode: 'ALWAYS_OFF'
   optimistic: true
   icon: mdi:water-alert-outline
   #arrete pompe filtration si pas de debit et activation de la securité
@@ -456,52 +549,84 @@ switch:
 #--------------------------------------
 # LED DE CONTROLE VISUEL
 light:
+  - platform: status_led
+    name: "${friendly_name} Led Status Esp"
+    output: led1
+
   - platform: binary
     name: "${friendly_name} Pompe Filtration Status Led"
     id: EspJardinPiscineStatusLed1
-    output: led1
+    output: led3
     
   - platform: binary
     name: "${friendly_name} Debit Eau Status Led"
     id: EspJardinPiscineStatusLed2
-    output: led2
-
-# reserve led de status
-  - platform: binary
-    name: "${friendly_name} Status Led 3"
-    id: EspJardinPiscineStatusLed3
-    output: led3
-
-  - platform: binary
-    name: "${friendly_name} Status Led 4"
-    id: EspJardinPiscineStatusLed4
     output: led4
 
+# reserve led de status
+#  - platform: binary
+#    name: "${friendly_name} Status Led 3"
+#    id: EspJardinPiscineStatusLed3
+#    output: led3
+
+#  - platform: binary
+#    name: "${friendly_name} Status Led 4"
+#    id: EspJardinPiscineStatusLed4
+#    output: led4
+
+#LED ADRESSABLE 5V (2 dispos indépendante)
+  - platform: neopixelbus
+    name: "${friendly_name} Rgb Led Gpio 13"
+    pin: 13
+    variant: WS2812
+    id: EspJardinPiscine_Rgb_Led_Gpio_13
+    num_leds: 1
+    type: rgb
+    #method: ESP32_I2S_0
+    method:
+      type: esp32_rmt
+      channel: 0
+
+  - platform: neopixelbus
+    name: "${friendly_name} Rgb Led Gpio 14"
+    pin: 14
+    variant: WS2812
+    id: EspJardinPiscine_Rgb_Led_Gpio_14
+    num_leds: 1
+    type: rgb
+    #method: ESP32_I2S_1
+    method:
+      type: esp32_rmt
+      channel: 1
+
+#LED simple (4 dispos : 2 rouge - 2 verte)
 output:
   - id: led1
     platform: gpio
-    pin:
-      pcf8574: pcf8575_hub
+    pin: 
+      pca6416a: pca6416a_hub
       number: 15
-      inverted: True
-  
-  - id: led2 #blue led
+      inverted: true
+
+  - id: led2
     platform: gpio
-    pin:
-      pcf8574: pcf8575_hub
+    pin: 
+      pca6416a: pca6416a_hub
       number: 14
-      inverted: True
+      inverted: true
 
   - id: led3
     platform: gpio
-    pin:
-      pcf8574: pcf8575_hub
+    pin: 
+      pca6416a: pca6416a_hub
       number: 13
-      inverted: True
+      inverted: true
 
   - id: led4
     platform: gpio
-    pin:
-      pcf8574: pcf8575_hub
+    pin: 
+      pca6416a: pca6416a_hub
       number: 12
       inverted: True
+
+
