@@ -18,7 +18,7 @@
 - [sonde ph](https://www.aliexpress.com/item/32995322213.html?spm=a2g0o.order_list.order_list_main.66.58601802quQO2y)
 - prises en charge pour pvc pression 50mm
 - [puits de sonde ds18b20](https://www.amazon.fr/dp/B07DXFWV6B?psc=1&ref=ppx_yo2ov_dt_b_product_details)
-- [isolateur i2c dfrobot pour le capteur PH](https://www.dfrobot.com/product-1778.html) 
+- [isolateur i2c dfrobot pour le capteur PH](https://www.dfrobot.com/product-1778.html)  lecture impossible sans l'isolateur / trop de parasite
 
 ### Montage :
 
